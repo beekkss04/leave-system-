@@ -51,7 +51,7 @@ router.post("/auth/login", async (req, res) => {
 // Apply for leave (with overlap check)
 router.post("/leave", protect, async (req, res) => {
   try {
-    const { startDate, endDate, reason } = req.body;
+    const { startDate, endDate, reason, leaveType } = req.body;
     const start = new Date(startDate),
       end = new Date(endDate);
     if (end < start)
@@ -74,6 +74,7 @@ router.post("/leave", protect, async (req, res) => {
       startDate: start,
       endDate: end,
       reason,
+      leaveType,
     });
     res.status(201).json(leave);
   } catch (e) {
@@ -84,9 +85,22 @@ router.post("/leave", protect, async (req, res) => {
 // My history
 router.get("/leave/my-requests", protect, async (req, res) =>
   res.json(
-    await LeaveRequest.find({ employee: req.user.id }).sort("-createdAt"),
+    await LeaveRequest.find({ employee: req.user.id })
+      .populate("reviewedBy", "name")
+      .sort("-createdAt"),
   ),
 );
+
+// Manager: ALL requests of my team (any status) - used for dashboard numbers and All Requests
+router.get("/leave/team", protect, managerOnly, async (req, res) => {
+  const team = await Employee.find({ manager: req.user.id }).distinct("_id");
+  res.json(
+    await LeaveRequest.find({ employee: { $in: team } })
+      .populate("employee", "name email")
+      .populate("reviewedBy", "name")
+      .sort("-createdAt"),
+  );
+});
 
 // Manager: pending requests of MY team only
 router.get("/leave/pending", protect, managerOnly, async (req, res) => {
@@ -127,6 +141,8 @@ router.patch("/leave/:id/status", protect, managerOnly, async (req, res) => {
   if (String(leave.employee.manager) !== req.user.id)
     return res.status(403).json({ message: "Not in your team" });
   leave.status = status;
+  leave.reviewedBy = req.user.id;
+  leave.reviewedAt = new Date();
   await leave.save();
   res.json({ _id: leave._id, status: leave.status });
 });

@@ -22,7 +22,14 @@ const LeaveRequest = mongoose.model(
       },
       startDate: { type: Date, required: true },
       endDate: { type: Date, required: true },
+      leaveType: {
+        type: String,
+        enum: ["Casual", "Sick", "Annual"],
+        default: "Casual",
+      },
       reason: { type: String, required: true },
+      reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Employee" },
+      reviewedAt: Date,
       status: {
         type: String,
         enum: ["pending", "approved", "rejected"],
